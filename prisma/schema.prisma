@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ── Main Quizzes ─────────────────────────────────────────────
+model Quiz {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  timeLimit   Int
+  questions   String    // JSON QuizQuestion[]
+  category    String    @default("general") // "maths" | "science" | "english" | "general"
+  isRetry     Boolean   @default(false)     // system-generated retry quiz
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  attempts    Attempt[]
+}
+
+model Attempt {
+  id          String   @id @default(cuid())
+  quizId      String
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  sessionId   String
+  answers     String   // JSON { [questionIndex]: selectedOptionIndex | null }
+  score       Int
+  totalScore  Int
+  timeTaken   Int
+  isRetry     Boolean  @default(false)
+  completedAt DateTime @default(now())
+  startedAt   DateTime
+}
+
+// ── English: Vocabulary ──────────────────────────────────────
+model VocabSet {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  createdAt   DateTime    @default(now())
+  words       VocabWord[]
+  attempts    VocabAttempt[]
+}
+
+model VocabWord {
+  id          String    @id @default(cuid())
+  setId       String
+  set         VocabSet  @relation(fields: [setId], references: [id], onDelete: Cascade)
+  word        String
+  meaning     String
+  example     String?   // example sentence
+  mnemonic    String?   // AI memory trick
+  tips        String?   // AI learning tip
+  partOfSpeech String?  // noun, verb, adj...
+  createdAt   DateTime  @default(now())
+}
+
+model VocabAttempt {
+  id          String   @id @default(cuid())
+  setId       String
+  set         VocabSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  sessionId   String
+  wrongWordIds String  // JSON string[] of VocabWord IDs answered wrong
+  score       Int
+  total       Int
+  timeTaken   Int
+  completedAt DateTime @default(now())
+}
+
+// ── English: Grammar (DRR format) ───────────────────────────
+model GrammarRule {
+  id           String    @id @default(cuid())
+  title        String    // e.g. "Articles - THE - II"
+  topic        String    // e.g. "articles", "tenses", "prepositions"
+  rule         String    // basic rule text
+  memoryTrick  String?   // mnemonic
+  examples     String    // JSON: { correct: string[], wrong: string[] }
+  examTraps    String?   // common mistakes text
+  questions    String?   // JSON QuizQuestion[] — practice questions from DRR
+  createdAt    DateTime  @default(now())
+}
