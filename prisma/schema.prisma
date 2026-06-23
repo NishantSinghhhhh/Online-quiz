@@ -14,11 +14,24 @@ model Quiz {
   description String?
   timeLimit   Int
   questions   String    // JSON QuizQuestion[]
-  category    String    @default("general") // "maths" | "science" | "english" | "general"
+  category    String    @default("general") // see src/lib/categories.ts
+  exam        String    @default("cds")     // "afcat" | "cds"
+  paperType   String    @default("chapter") // "chapter" | "mock"
   isRetry     Boolean   @default(false)     // system-generated retry quiz
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   attempts    Attempt[]
+}
+
+// ── Users (auth) ─────────────────────────────────────────────
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("user") // "admin" | "user"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Attempt {
@@ -27,8 +40,8 @@ model Attempt {
   quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   sessionId   String
   answers     String   // JSON { [questionIndex]: selectedOptionIndex | null }
-  score       Int
-  totalScore  Int
+  score       Float    // can be fractional due to 1/3 negative marking
+  totalScore  Float
   timeTaken   Int
   isRetry     Boolean  @default(false)
   completedAt DateTime @default(now())
@@ -72,13 +85,38 @@ model VocabAttempt {
 
 // ── English: Grammar (DRR format) ───────────────────────────
 model GrammarRule {
-  id           String    @id @default(cuid())
-  title        String    // e.g. "Articles - THE - II"
-  topic        String    // e.g. "articles", "tenses", "prepositions"
-  rule         String    // basic rule text
-  memoryTrick  String?   // mnemonic
-  examples     String    // JSON: { correct: string[], wrong: string[] }
-  examTraps    String?   // common mistakes text
-  questions    String?   // JSON QuizQuestion[] — practice questions from DRR
-  createdAt    DateTime  @default(now())
+  id           String           @id @default(cuid())
+  title        String
+  topic        String
+  rule         String
+  memoryTrick  String?
+  examples     String           // JSON: { correct: string[], wrong: string[] }
+  examTraps    String?
+  questions    String?          // JSON QuizQuestion[]
+  createdAt    DateTime         @default(now())
+  attempts     GrammarAttempt[]
+}
+
+model GrammarAttempt {
+  id          String      @id @default(cuid())
+  ruleId      String
+  rule        GrammarRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  sessionId   String
+  wrongIds    String      // JSON number[] — 0-based indices of questions answered wrong
+  score       Int
+  total       Int
+  timeTaken   Int
+  completedAt DateTime    @default(now())
+}
+
+// ── AI 1-pager notes (1 page per 20 input pages) ─────────────
+model NoteSet {
+  id          String   @id @default(cuid())
+  subject     String   // "english" | "physics" | "chemistry" | "biology" | "maths" | "general"
+  title       String
+  summary     String?
+  sections    String   // JSON: { heading: string, points: string[] }[]
+  sourcePages Int
+  targetPages Int
+  createdAt   DateTime @default(now())
 }

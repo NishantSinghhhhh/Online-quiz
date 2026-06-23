@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { QuizQuestion } from "@/types/quiz";
+import { normalizeCategoryId, getCategory, VALID_CATEGORY_IDS, type CategoryId } from "@/lib/categories";
 
-// POST: create a retry quiz from wrong answers
+// POST: create a retry quiz from wrong answers — optionally filtered to a single subject.
+// Body: { sessionId: string, subject?: CategoryId | "all" }
 export async function POST(req: NextRequest) {
   try {
-    const { sessionId } = await req.json();
+    const { sessionId, subject } = await req.json();
     if (!sessionId) return NextResponse.json({ error: "Missing sessionId" }, { status: 400 });
+
+    const subjectFilter: CategoryId | null =
+      subject && subject !== "all" && (VALID_CATEGORY_IDS as readonly string[]).includes(subject)
+        ? (subject as CategoryId)
+        : null;
 
     const attempts = await prisma.attempt.findMany({
       where: { sessionId },
@@ -16,6 +23,9 @@ export async function POST(req: NextRequest) {
     const wrongQuestions: QuizQuestion[] = [];
 
     for (const attempt of attempts) {
+      const cat = normalizeCategoryId(attempt.quiz.category);
+      if (subjectFilter && cat !== subjectFilter) continue;
+
       const questions: QuizQuestion[] = JSON.parse(attempt.quiz.questions);
       const answers: Record<number, number | null> = JSON.parse(attempt.answers);
       questions.forEach((q, i) => {
@@ -27,20 +37,28 @@ export async function POST(req: NextRequest) {
     }
 
     if (wrongQuestions.length === 0) {
-      return NextResponse.json({ error: "No wrong answers to practice" }, { status: 400 });
+      const where = subjectFilter ? ` for ${getCategory(subjectFilter).label}` : "";
+      return NextResponse.json({ error: `No wrong answers to practice${where}` }, { status: 400 });
     }
 
-    // Re-number IDs
     const numbered = wrongQuestions.map((q, i) => ({ ...q, id: i + 1 }));
-    const timeLimit = Math.max(5, Math.ceil((numbered.length * 1.5)));
+    const timeLimit = Math.max(5, Math.ceil(numbered.length * 1.5));
+
+    const meta = subjectFilter ? getCategory(subjectFilter) : null;
+    const title = meta
+      ? `Practice: My Wrong ${meta.label} Answers`
+      : "Practice: My Wrong Answers";
+    const description = meta
+      ? `Auto-generated retry quiz with ${numbered.length} ${meta.label} questions you got wrong`
+      : `Auto-generated retry quiz with ${numbered.length} questions you got wrong`;
 
     const quiz = await prisma.quiz.create({
       data: {
-        title: "Practice: My Wrong Answers",
-        description: `Auto-generated retry quiz with ${numbered.length} questions you got wrong`,
+        title,
+        description,
         timeLimit,
         questions: JSON.stringify(numbered),
-        category: "general",
+        category: subjectFilter ?? "general",
         isRetry: true,
       },
     });

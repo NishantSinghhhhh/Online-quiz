@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Sparkles, BookOpen, GraduationCap, ArrowRight, Globe, FileText } from "lucide-react";
+import { Sparkles, BookOpen, GraduationCap, ArrowRight, Globe, FileText, ScrollText } from "lucide-react";
 
 export default function EnglishPage() {
   const [vocabCount, setVocabCount] = useState(0);
@@ -77,6 +77,24 @@ export default function EnglishPage() {
             </div>
           </Link>
         </div>
+
+        {/* Note Compressor */}
+        <Link href="/english/notes" className="group block mt-6 border-2 border-slate-200 hover:border-amber-400 rounded-2xl p-8 transition-all hover:shadow-lg bg-white">
+          <div className="flex items-center gap-5">
+            <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center group-hover:bg-amber-600 transition-colors shrink-0">
+              <ScrollText className="w-7 h-7 text-amber-600 group-hover:text-white transition-colors" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-slate-900 mb-1">Condense Notes</h2>
+              <p className="text-slate-500 text-sm">
+                Upload a PDF — get ~1 page of dense, exam-ready notes per 20 pages.
+              </p>
+            </div>
+            <span className="flex items-center gap-1 text-amber-600 font-medium text-sm group-hover:gap-2 transition-all">
+              Open <ArrowRight className="w-4 h-4" />
+            </span>
+          </div>
+        </Link>
 
         <div className="mt-8 bg-gradient-to-r from-violet-50 to-emerald-50 border border-slate-200 rounded-2xl p-6 text-center">
           <FileText className="w-8 h-8 text-slate-400 mx-auto mb-3" />

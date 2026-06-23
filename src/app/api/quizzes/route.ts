@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { normalizeCategoryId, categoriesForSection, SECTIONS, EXAMS, type SectionId } from "@/lib/categories";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
+    const paperType = searchParams.get("paperType");
+    const section = searchParams.get("section");
+    const exam = searchParams.get("exam");
 
     const where: Record<string, unknown> = { isRetry: false };
     if (category && category !== "all") where.category = category;
+    if (paperType && paperType !== "all") where.paperType = paperType;
+    if (exam && exam !== "all" && EXAMS.some(e => e.id === exam)) where.exam = exam;
+    // Section filter: include all categories within the requested section
+    if (section && section !== "all" && SECTIONS.some(s => s.id === section)) {
+      const catIds = categoriesForSection(section as SectionId).map(c => c.id);
+      if (!where.category) where.category = { in: catIds };
+    }
 
     const quizzes = await prisma.quiz.findMany({
       where,
@@ -21,7 +32,9 @@ export async function GET(req: NextRequest) {
         title: q.title,
         description: q.description,
         timeLimit: q.timeLimit,
-        category: q.category,
+        category: normalizeCategoryId(q.category),
+        exam: q.exam,
+        paperType: q.paperType,
         questionCount: JSON.parse(q.questions).length,
         attemptCount: q._count.attempts,
         createdAt: q.createdAt,
@@ -37,7 +50,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, description, timeLimit, questions, category, isRetry } = body;
+    const { title, description, timeLimit, questions, category, paperType, isRetry, exam } = body;
 
     if (!title || !timeLimit || !questions || !Array.isArray(questions)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -49,7 +62,9 @@ export async function POST(req: NextRequest) {
         description: description || null,
         timeLimit: Number(timeLimit),
         questions: JSON.stringify(questions),
-        category: category || "general",
+        category: normalizeCategoryId(category),
+        exam: exam === "afcat" ? "afcat" : "cds",
+        paperType: paperType === "mock" ? "mock" : "chapter",
         isRetry: isRetry || false,
       },
     });

@@ -17,6 +17,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { QuizQuestion } from "@/types/quiz";
+import { NEGATIVE_MARK_RATIO } from "@/lib/categories";
 
 interface AttemptResult {
   id: string;
@@ -86,13 +87,21 @@ export default function ResultsPage({
   const stats = result.questions.reduce(
     (acc, q, i) => {
       const selected = result.answers[i];
+      const marks = q.marks || 1;
       if (selected === null || selected === undefined) acc.skipped++;
-      else if (selected === q.correctAnswer) acc.correct++;
-      else acc.wrong++;
+      else if (selected === q.correctAnswer) {
+        acc.correct++;
+        acc.gained += marks;
+      } else {
+        acc.wrong++;
+        acc.penalty += marks * NEGATIVE_MARK_RATIO;
+      }
       return acc;
     },
-    { correct: 0, wrong: 0, skipped: 0 }
+    { correct: 0, wrong: 0, skipped: 0, gained: 0, penalty: 0 }
   );
+
+  const fmt = (n: number) => (Number.isInteger(n) ? n.toString() : n.toFixed(2));
 
   const wrongQuestions = result.questions.filter((q, i) => {
     const selected = result.answers[i];
@@ -139,11 +148,22 @@ export default function ResultsPage({
           <h1 className="text-2xl font-bold text-slate-900 mb-1">{result.quizTitle}</h1>
           <p className={`text-lg font-semibold mb-6 ${grade.color}`}>{grade.label}</p>
 
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <span className="text-6xl font-bold text-slate-900">{result.score}</span>
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <span className="text-6xl font-bold text-slate-900">{fmt(result.score)}</span>
             <span className="text-3xl text-slate-300 font-light">/</span>
-            <span className="text-3xl text-slate-400 font-medium">{result.totalScore}</span>
+            <span className="text-3xl text-slate-400 font-medium">{fmt(result.totalScore)}</span>
           </div>
+
+          {/* Negative-marking breakdown */}
+          {stats.penalty > 0 && (
+            <div className="flex items-center justify-center gap-4 mb-6 text-sm">
+              <span className="text-emerald-600">+{fmt(stats.gained)} earned</span>
+              <span className="text-red-500">−{fmt(stats.penalty)} penalty</span>
+              <span className="text-slate-400 text-xs px-2 py-0.5 bg-slate-100 rounded-full">
+                ⅓ negative marking
+              </span>
+            </div>
+          )}
 
           {/* Score ring */}
           <div className="flex items-center justify-center mb-8">

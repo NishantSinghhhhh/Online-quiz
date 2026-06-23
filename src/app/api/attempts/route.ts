@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { QuizQuestion } from "@/types/quiz";
+import { NEGATIVE_MARK_RATIO } from "@/lib/categories";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -43,15 +44,23 @@ export async function POST(req: NextRequest) {
     }
 
     const questions: QuizQuestion[] = JSON.parse(quiz.questions);
-    let score = 0;
+    // 1/3 negative marking — wrong answers deduct marks/3, skipped get 0.
+    let rawScore = 0;
     const totalScore = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
 
     questions.forEach((q, index) => {
       const selected = answers[index];
-      if (selected !== null && selected !== undefined && selected === q.correctAnswer) {
-        score += q.marks || 1;
+      const marks = q.marks || 1;
+      if (selected === null || selected === undefined) return; // skipped → no change
+      if (selected === q.correctAnswer) {
+        rawScore += marks;
+      } else {
+        rawScore -= marks * NEGATIVE_MARK_RATIO;
       }
     });
+
+    // Round to 2 dp and floor at 0 (don't show negative final scores)
+    const score = Math.max(0, Math.round(rawScore * 100) / 100);
 
     const now = new Date();
     const startTime = new Date(startedAt);

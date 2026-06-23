@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { QuizQuestion } from "@/types/quiz";
+import { normalizeCategoryId, type CategoryId } from "@/lib/categories";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest) {
   const wrongQuestions: Array<{
     quizId: string;
     quizTitle: string;
+    category: CategoryId;
     attemptId: string;
     completedAt: string;
     question: QuizQuestion;
@@ -30,6 +32,7 @@ export async function GET(req: NextRequest) {
   for (const attempt of attempts) {
     const questions: QuizQuestion[] = JSON.parse(attempt.quiz.questions);
     const answers: Record<number, number | null> = JSON.parse(attempt.answers);
+    const category = normalizeCategoryId(attempt.quiz.category);
 
     questions.forEach((q, i) => {
       const selected = answers[i];
@@ -40,6 +43,7 @@ export async function GET(req: NextRequest) {
         wrongQuestions.push({
           quizId: attempt.quizId,
           quizTitle: attempt.quiz.title,
+          category,
           attemptId: attempt.id,
           completedAt: attempt.completedAt.toISOString(),
           question: q,

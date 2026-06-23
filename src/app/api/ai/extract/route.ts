@@ -43,17 +43,21 @@ async function tryTextExtraction(buffer: Buffer): Promise<string | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (parser as any).getText();
     const text = result.text as string;
-    // Return null if text is empty or too short to be real content
     return text && text.trim().length >= 50 ? text : null;
   } catch {
     return null;
   }
 }
 
-async function extractViaOpenAIVision(buffer: Buffer, filename: string): Promise<string> {
+function limitPhrase(limit: number | null) {
+  return limit && limit > 0
+    ? `Extract only the FIRST ${limit} questions from the document, in document order. Stop after ${limit}.`
+    : "Extract ALL questions from the document. Include every question you can find.";
+}
+
+async function extractViaOpenAIVision(buffer: Buffer, filename: string, limit: number | null): Promise<string> {
   const base64 = buffer.toString("base64");
 
-  // GPT-4o supports PDFs natively as a file content type
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
@@ -71,7 +75,7 @@ async function extractViaOpenAIVision(buffer: Buffer, filename: string): Promise
           } as any,
           {
             type: "text",
-            text: "Extract ALL questions from this PDF question paper and convert them to the required JSON format. Include every question you can find.",
+            text: `${limitPhrase(limit)} Convert them to the required JSON format.`,
           },
         ],
       },
@@ -83,7 +87,7 @@ async function extractViaOpenAIVision(buffer: Buffer, filename: string): Promise
   return completion.choices[0]?.message?.content ?? "";
 }
 
-async function extractViaText(text: string): Promise<string> {
+async function extractViaText(text: string, limit: number | null): Promise<string> {
   const textToSend =
     text.length > 15000
       ? text.slice(0, 15000) + "\n\n[Document truncated at 15000 characters]"
@@ -95,7 +99,7 @@ async function extractViaText(text: string): Promise<string> {
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
-        content: `Here is the text extracted from the question paper. Extract ALL questions and convert to JSON:\n\n---\n${textToSend}\n---`,
+        content: `Here is the text extracted from the question paper. ${limitPhrase(limit)} Convert to JSON:\n\n---\n${textToSend}\n---`,
       },
     ],
     response_format: { type: "json_object" },
@@ -109,6 +113,8 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
+    const limitRaw = formData.get("limit");
+    const limit = limitRaw ? Math.max(1, parseInt(String(limitRaw), 10) || 0) : null;
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
@@ -121,23 +127,19 @@ export async function POST(req: NextRequest) {
     let method = "";
 
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-      // First: try fast text extraction
       const extractedText = await tryTextExtraction(buffer);
 
       if (extractedText) {
-        // Text-based PDF — send text to GPT-4o
         method = "text";
-        aiResponseContent = await extractViaText(extractedText);
+        aiResponseContent = await extractViaText(extractedText, limit);
       } else {
-        // Scanned / image-based PDF — send raw PDF to GPT-4o vision
         method = "vision";
-        aiResponseContent = await extractViaOpenAIVision(buffer, file.name);
+        aiResponseContent = await extractViaOpenAIVision(buffer, file.name, limit);
       }
     } else {
-      // Plain text / markdown file
       method = "text";
       const text = buffer.toString("utf-8");
-      aiResponseContent = await extractViaText(text);
+      aiResponseContent = await extractViaText(text, limit);
     }
 
     if (!aiResponseContent) {
@@ -153,10 +155,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Safety net — enforce the limit on our side even if the AI overshot
+    if (limit && quizData.questions.length > limit) {
+      quizData.questions = quizData.questions.slice(0, limit);
+    }
+
     return NextResponse.json({
       quiz: quizData,
       questionsFound: quizData.questions.length,
-      method, // "text" or "vision"
+      method,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to extract questions";

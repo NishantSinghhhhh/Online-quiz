@@ -4,9 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "postinstall": "prisma generate",
+    "lint": "eslint",
+    "seed": "tsx prisma/seed.ts",
+    "migrate:turso": "tsx prisma/migrate-turso.ts",
+    "sync:turso": "tsx prisma/sync-to-turso.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
@@ -15,7 +19,9 @@
     "@types/multer": "^2.1.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/uuid": "^10.0.0",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
+    "jose": "^6.2.3",
     "lucide-react": "^1.18.0",
     "multer": "^2.1.1",
     "next": "16.2.9",
@@ -24,16 +30,19 @@
     "prisma": "^7.8.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "recharts": "^3.8.1",
     "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

@@ -64,7 +64,6 @@ Make sure to:
 
     const quizData = JSON.parse(content);
 
-    // Validate structure
     if (!quizData.questions || !Array.isArray(quizData.questions)) {
       return NextResponse.json({ error: "Invalid quiz structure from AI" }, { status: 500 });
     }

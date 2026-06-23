@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Sparkles,
@@ -13,16 +13,17 @@ import {
   BookOpen,
   Target,
   Search,
-  Filter,
   Lightbulb,
   Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { QuizQuestion } from "@/types/quiz";
+import { CATEGORIES, getCategory, type CategoryId } from "@/lib/categories";
 
 interface WrongQuestion {
   quizId: string;
   quizTitle: string;
+  category: CategoryId;
   attemptId: string;
   completedAt: string;
   question: QuizQuestion;
@@ -30,6 +31,8 @@ interface WrongQuestion {
   yourAnswer: number | null;
   correctAnswer: number;
 }
+
+type SubjectTab = CategoryId | "all";
 
 function getSessionId(): string {
   let id = localStorage.getItem("quiz_session_id");
@@ -47,9 +50,9 @@ export default function ReviewPage() {
   const [totalAttempts, setTotalAttempts] = useState(0);
   const [expandedIndex, setExpandedIndex] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filterQuiz, setFilterQuiz] = useState("all");
+  const [subjectTab, setSubjectTab] = useState<SubjectTab>("all");
   const [filterType, setFilterType] = useState<"all" | "wrong" | "skipped">("all");
-  const [creatingRetry, setCreatingRetry] = useState(false);
+  const [creatingRetry, setCreatingRetry] = useState<SubjectTab | null>(null);
 
   useEffect(() => {
     const sessionId = getSessionId();
@@ -62,44 +65,65 @@ export default function ReviewPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleCreateRetryQuiz() {
-    setCreatingRetry(true);
+  // ── Per-subject counts (always computed across the full set) ─
+  const countsBySubject = useMemo(() => {
+    const map: Record<string, { total: number; wrong: number; skipped: number }> = {};
+    for (const q of questions) {
+      const key = q.category;
+      if (!map[key]) map[key] = { total: 0, wrong: 0, skipped: 0 };
+      map[key].total += 1;
+      if (q.yourAnswer === null) map[key].skipped += 1;
+      else map[key].wrong += 1;
+    }
+    return map;
+  }, [questions]);
+
+  // Subjects that actually have wrong/skipped questions
+  const activeSubjects = useMemo(
+    () => CATEGORIES.filter((c) => countsBySubject[c.id]?.total > 0),
+    [countsBySubject]
+  );
+
+  async function handleCreateRetryQuiz(subject: SubjectTab) {
+    setCreatingRetry(subject);
     const sessionId = getSessionId();
     const res = await fetch("/api/retry-quiz", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify({ sessionId, subject }),
     });
     const data = await res.json();
-    setCreatingRetry(false);
+    setCreatingRetry(null);
     if (data.quizId) router.push(`/quiz/retry?quizId=${data.quizId}`);
   }
 
-  const uniqueQuizzes = Array.from(new Set(questions.map((q) => q.quizTitle)));
-
   const filtered = questions.filter((item) => {
+    const matchSubject = subjectTab === "all" || item.category === subjectTab;
     const matchSearch =
       !search ||
       item.question.question.toLowerCase().includes(search.toLowerCase()) ||
       item.quizTitle.toLowerCase().includes(search.toLowerCase());
-    const matchQuiz = filterQuiz === "all" || item.quizTitle === filterQuiz;
     const isSkipped = item.yourAnswer === null;
     const matchType =
       filterType === "all" ||
       (filterType === "skipped" && isSkipped) ||
       (filterType === "wrong" && !isSkipped);
-    return matchSearch && matchQuiz && matchType;
+    return matchSubject && matchSearch && matchType;
   });
 
-  const wrongCount = questions.filter((q) => q.yourAnswer !== null).length;
-  const skippedCount = questions.filter((q) => q.yourAnswer === null).length;
+  // Counts for the currently-selected subject tab
+  const currentCount = subjectTab === "all"
+    ? { total: questions.length, wrong: questions.filter((q) => q.yourAnswer !== null).length, skipped: questions.filter((q) => q.yourAnswer === null).length }
+    : (countsBySubject[subjectTab] ?? { total: 0, wrong: 0, skipped: 0 });
+
+  const currentMeta = subjectTab === "all" ? null : getCategory(subjectTab);
 
   const key = (item: WrongQuestion) => `${item.attemptId}-${item.questionIndex}`;
 
   return (
     <div className="min-h-screen bg-slate-50">
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
               <Sparkles className="w-3.5 h-3.5 text-white" />
@@ -112,59 +136,19 @@ export default function ReviewPage() {
         </div>
       </nav>
 
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-6 py-8">
         <Link href="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-6 transition-colors">
           <ChevronLeft className="w-4 h-4" /> Back
         </Link>
 
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-1 flex items-center gap-3">
-              <Target className="w-8 h-8 text-red-500" />
-              Wrong Answers Bank
-            </h1>
-            <p className="text-slate-500">
-              All questions you got wrong or skipped across {totalAttempts} attempt{totalAttempts !== 1 ? "s" : ""}
-            </p>
-          </div>
-        </div>
-
-        {/* Practice button */}
-        {questions.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 flex items-center justify-between gap-4">
-            <div>
-              <p className="font-semibold text-amber-900">Ready to practice?</p>
-              <p className="text-sm text-amber-700 mt-0.5">Create a quiz from your {questions.filter(q => q.yourAnswer !== null).length} wrong answers — with hints available.</p>
-            </div>
-            <button
-              onClick={handleCreateRetryQuiz}
-              disabled={creatingRetry}
-              className="flex items-center gap-2 bg-amber-500 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-amber-600 disabled:opacity-60 transition-colors shrink-0"
-            >
-              {creatingRetry ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lightbulb className="w-4 h-4" />}
-              {creatingRetry ? "Creating..." : "Practice Wrong Answers"}
-            </button>
-          </div>
-        )}
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 text-center">
-            <div className="text-3xl font-bold text-slate-900">{questions.length}</div>
-            <div className="text-sm text-slate-500 mt-1">Total to review</div>
-          </div>
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-5 text-center">
-            <div className="text-3xl font-bold text-red-600">{wrongCount}</div>
-            <div className="text-sm text-red-500 mt-1 flex items-center justify-center gap-1">
-              <XCircle className="w-3.5 h-3.5" /> Answered wrong
-            </div>
-          </div>
-          <div className="bg-slate-100 border border-slate-200 rounded-2xl p-5 text-center">
-            <div className="text-3xl font-bold text-slate-500">{skippedCount}</div>
-            <div className="text-sm text-slate-400 mt-1 flex items-center justify-center gap-1">
-              <MinusCircle className="w-3.5 h-3.5" /> Skipped
-            </div>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-900 mb-1 flex items-center gap-3">
+            <Target className="w-8 h-8 text-red-500" />
+            Wrong Answers Bank
+          </h1>
+          <p className="text-slate-500">
+            All questions you got wrong or skipped across {totalAttempts} attempt{totalAttempts !== 1 ? "s" : ""}
+          </p>
         </div>
 
         {loading ? (
@@ -187,7 +171,116 @@ export default function ReviewPage() {
           </div>
         ) : (
           <>
-            {/* Filters */}
+            {/* Subject tabs */}
+            <div className="flex gap-2 flex-wrap mb-6">
+              <SubjectTabButton
+                active={subjectTab === "all"}
+                onClick={() => setSubjectTab("all")}
+                label="All Subjects"
+                count={questions.length}
+                color="indigo"
+              />
+              {activeSubjects.map((cat) => {
+                const c = countsBySubject[cat.id];
+                return (
+                  <SubjectTabButton
+                    key={cat.id}
+                    active={subjectTab === cat.id}
+                    onClick={() => setSubjectTab(cat.id)}
+                    label={cat.label}
+                    count={c.total}
+                    pillClasses={cat.pillClasses}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Practice CTA for current tab */}
+            {currentCount.total > 0 && (
+              <div className={`rounded-2xl p-5 mb-6 flex items-center justify-between gap-4 border ${
+                currentMeta
+                  ? `${currentMeta.pillClasses} border-current/20`
+                  : "bg-amber-50 border-amber-200"
+              }`}>
+                <div>
+                  <p className="font-semibold">
+                    {currentMeta ? `Practice ${currentMeta.label}` : "Ready to practice?"}
+                  </p>
+                  <p className="text-sm mt-0.5 opacity-90">
+                    Create a quiz from your <strong>{currentCount.total}</strong>{" "}
+                    {currentMeta ? `${currentMeta.label.toLowerCase()} ` : ""}wrong question{currentCount.total !== 1 ? "s" : ""}.
+                    {currentCount.wrong > 0 && currentCount.skipped > 0 && ` (${currentCount.wrong} wrong · ${currentCount.skipped} skipped)`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleCreateRetryQuiz(subjectTab)}
+                  disabled={creatingRetry !== null}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-white disabled:opacity-60 transition-colors shrink-0 ${
+                    currentMeta ? "bg-slate-900 hover:bg-slate-800" : "bg-amber-500 hover:bg-amber-600"
+                  }`}
+                >
+                  {creatingRetry === subjectTab ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lightbulb className="w-4 h-4" />}
+                  {creatingRetry === subjectTab ? "Creating..." : "Practice Now"}
+                </button>
+              </div>
+            )}
+
+            {/* Per-subject summary cards (only shown on "All" tab) */}
+            {subjectTab === "all" && activeSubjects.length > 1 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+                {activeSubjects.map((cat) => {
+                  const c = countsBySubject[cat.id];
+                  const Icon = cat.icon;
+                  return (
+                    <div
+                      key={cat.id}
+                      className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-3 hover:border-slate-300 transition-colors"
+                    >
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${cat.pillClasses}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900">{cat.label}</p>
+                        <p className="text-xs text-slate-500">
+                          {c.total} wrong{c.skipped > 0 ? ` (${c.skipped} skipped)` : ""}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleCreateRetryQuiz(cat.id)}
+                        disabled={creatingRetry !== null}
+                        className="text-xs font-medium bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-60 shrink-0 flex items-center gap-1"
+                        title={`Practice ${c.total} wrong ${cat.label} questions`}
+                      >
+                        {creatingRetry === cat.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Lightbulb className="w-3 h-3" />}
+                        Practice
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Stat counts for current tab */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 text-center">
+                <div className="text-3xl font-bold text-slate-900">{currentCount.total}</div>
+                <div className="text-sm text-slate-500 mt-1">Total to review</div>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-5 text-center">
+                <div className="text-3xl font-bold text-red-600">{currentCount.wrong}</div>
+                <div className="text-sm text-red-500 mt-1 flex items-center justify-center gap-1">
+                  <XCircle className="w-3.5 h-3.5" /> Answered wrong
+                </div>
+              </div>
+              <div className="bg-slate-100 border border-slate-200 rounded-2xl p-5 text-center">
+                <div className="text-3xl font-bold text-slate-500">{currentCount.skipped}</div>
+                <div className="text-sm text-slate-400 mt-1 flex items-center justify-center gap-1">
+                  <MinusCircle className="w-3.5 h-3.5" /> Skipped
+                </div>
+              </div>
+            </div>
+
+            {/* Search + wrong/skipped filter */}
             <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4 flex flex-wrap gap-3 items-center">
               <div className="flex items-center gap-2 flex-1 min-w-48 border border-slate-200 rounded-xl px-3 py-2">
                 <Search className="w-4 h-4 text-slate-400 shrink-0" />
@@ -200,32 +293,18 @@ export default function ReviewPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-slate-400" />
-                <select
-                  value={filterQuiz}
-                  onChange={(e) => setFilterQuiz(e.target.value)}
-                  className="text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                >
-                  <option value="all">All quizzes</option>
-                  {uniqueQuizzes.map((q) => (
-                    <option key={q} value={q}>{q}</option>
-                  ))}
-                </select>
-
-                <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
-                  {(["all", "wrong", "skipped"] as const).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setFilterType(f)}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium capitalize transition-colors ${
-                        filterType === f ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
+                {(["all", "wrong", "skipped"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFilterType(f)}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium capitalize transition-colors ${
+                      filterType === f ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
               </div>
 
               <span className="text-sm text-slate-400 ml-auto">
@@ -243,6 +322,7 @@ export default function ReviewPage() {
                     const k = key(item);
                     const isExpanded = expandedIndex === k;
                     const isSkipped = item.yourAnswer === null;
+                    const itemCat = getCategory(item.category);
 
                     return (
                       <div key={k} className="animate-fade-in">
@@ -260,7 +340,10 @@ export default function ReviewPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <span className="text-xs font-medium bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${itemCat.pillClasses}`}>
+                                  {itemCat.label}
+                                </span>
+                                <span className="text-xs font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
                                   {item.quizTitle}
                                 </span>
                                 <span className="text-xs text-slate-400">
@@ -378,5 +461,42 @@ export default function ReviewPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function SubjectTabButton({
+  active,
+  onClick,
+  label,
+  count,
+  color,
+  pillClasses,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+  color?: "indigo";
+  pillClasses?: string;
+}) {
+  const activeClasses = color === "indigo"
+    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+    : "bg-slate-900 text-white border-slate-900 shadow-sm";
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+        active ? activeClasses : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+      }`}
+    >
+      <span>{label}</span>
+      <span
+        className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+          active ? "bg-white/20 text-white" : pillClasses ?? "bg-slate-100 text-slate-600"
+        }`}
+      >
+        {count}
+      </span>
+    </button>
   );
 }

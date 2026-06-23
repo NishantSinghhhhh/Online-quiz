@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sparkles,
   ChevronLeft,
@@ -17,6 +17,17 @@ import {
   ScanText,
 } from "lucide-react";
 import { QuizData, QuizQuestion } from "@/types/quiz";
+import {
+  CATEGORIES,
+  SECTIONS,
+  EXAMS,
+  getCategory,
+  getSection,
+  getExam,
+  categoriesForSection,
+  type SectionId,
+  type ExamId,
+} from "@/lib/categories";
 
 const EXAMPLE_JSON = `{
   "title": "JavaScript Fundamentals",
@@ -48,6 +59,7 @@ type Mode = "json" | "prompt" | "upload" | "extract";
 
 export default function CreateQuizPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("prompt");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -71,9 +83,65 @@ export default function CreateQuizPage() {
   // Extract mode
   const [extractFile, setExtractFile] = useState<File | null>(null);
   const [extractInfo, setExtractInfo] = useState<{ found: number; method: string } | null>(null);
+  const [extractCount, setExtractCount] = useState<string>("all");
 
-  // Category
+  // Exam (afcat | cds) — locks the set of sections available
+  const [exam, setExam] = useState<ExamId>("cds");
+  // Section within the exam
+  const [section, setSection] = useState<SectionId>("cds_gs");
+  // Category within the section
   const [category, setCategory] = useState("general");
+  // Paper type — chapter-wise (default) or full mock paper
+  const [paperType, setPaperType] = useState<"chapter" | "mock">("chapter");
+
+  useEffect(() => {
+    const e = searchParams.get("exam");
+    const s = searchParams.get("section");
+    const c = searchParams.get("category");
+    const p = searchParams.get("paperType");
+
+    const examId: ExamId = e === "afcat" ? "afcat" : e === "cds" ? "cds" : "cds";
+    setExam(examId);
+
+    let sectionId: SectionId | null = null;
+    if (s && SECTIONS.some(x => x.id === s)) sectionId = s as SectionId;
+    if (!sectionId) {
+      // Default section per exam
+      sectionId = examId === "afcat" ? "afcat_general" : "cds_gs";
+    }
+    setSection(sectionId);
+
+    // Pick a category that belongs to the chosen section
+    const allowed = categoriesForSection(sectionId).map(x => x.id);
+    if (c && allowed.includes(getCategory(c).id)) {
+      setCategory(getCategory(c).id);
+    } else {
+      setCategory(allowed[0] ?? "general");
+    }
+    if (p === "mock" || p === "chapter") setPaperType(p);
+  }, [searchParams]);
+
+  function selectExam(id: ExamId) {
+    setExam(id);
+    const firstSection = SECTIONS.find(s => s.exam === id);
+    if (firstSection) {
+      setSection(firstSection.id);
+      const firstCat = categoriesForSection(firstSection.id)[0];
+      if (firstCat) setCategory(firstCat.id);
+    }
+  }
+
+  function selectSection(id: SectionId) {
+    setSection(id);
+    const firstCat = categoriesForSection(id)[0];
+    if (firstCat) setCategory(firstCat.id);
+  }
+
+  // Categories the user can pick from — locked to current section
+  const availableCategories = categoriesForSection(section);
+  const sectionMeta = getSection(section);
+  const examMeta = getExam(exam);
+  const sectionsForCurrentExam = SECTIONS.filter(s => s.exam === exam);
 
   function parseAndPreview(jsonStr: string) {
     try {
@@ -152,6 +220,7 @@ export default function CreateQuizPage() {
     try {
       const formData = new FormData();
       formData.append("file", extractFile);
+      if (extractCount !== "all") formData.append("limit", extractCount);
 
       const res = await fetch("/api/ai/extract", { method: "POST", body: formData });
       const data = await res.json();
@@ -179,6 +248,8 @@ export default function CreateQuizPage() {
           timeLimit: quizData.timeLimit,
           questions: quizData.questions,
           category,
+          exam,
+          paperType,
         }),
       });
       const data = await res.json();
@@ -213,26 +284,98 @@ export default function CreateQuizPage() {
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Create New Quiz</h1>
         <p className="text-slate-500 mb-8">Choose how you want to create your quiz</p>
 
-        {/* Category picker */}
-        <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 mb-6">
-          <span className="text-sm font-semibold text-slate-700 shrink-0">Quiz Category:</span>
-          <div className="flex flex-wrap gap-2">
-            {([
-              { id: "general", label: "General", color: "bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-400" },
-              { id: "maths", label: "Maths", color: "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-500" },
-              { id: "science", label: "General Science", color: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-500" },
-              { id: "english", label: "English", color: "bg-violet-50 text-violet-700 border-violet-200 hover:border-violet-500" },
-            ] as const).map(({ id, label, color }) => (
+        {/* Exam picker */}
+        <div className={`flex items-center gap-3 rounded-2xl px-5 py-4 mb-3 bg-gradient-to-r ${examMeta.gradient} text-white`}>
+          <examMeta.icon className="w-6 h-6" />
+          <div className="flex-1">
+            <p className="text-xs font-medium opacity-80 uppercase tracking-wide">Exam</p>
+            <p className="text-lg font-bold">{examMeta.fullName}</p>
+          </div>
+          <div className="flex gap-1.5">
+            {EXAMS.map((e) => (
               <button
-                key={id}
-                onClick={() => setCategory(id)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${color} ${category === id ? "ring-2 ring-offset-1 ring-indigo-400 font-bold" : "opacity-60 hover:opacity-100"}`}
+                key={e.id}
+                onClick={() => selectExam(e.id)}
+                className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
+                  exam === e.id ? "bg-white/30 text-white" : "bg-white/10 hover:bg-white/20"
+                }`}
               >
-                {label}
+                {e.shortLabel}
               </button>
             ))}
           </div>
-          <span className="ml-auto text-xs text-slate-400">Selected: <strong className="text-slate-700">{category === "science" ? "General Science" : category.charAt(0).toUpperCase() + category.slice(1)}</strong></span>
+        </div>
+
+        {/* Section picker (within the exam) */}
+        <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 mb-3 flex-wrap">
+          <span className="text-sm font-semibold text-slate-700 shrink-0">Paper:</span>
+          <div className="flex flex-wrap gap-2">
+            {sectionsForCurrentExam.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => selectSection(s.id)}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${
+                  section === s.id
+                    ? "border-slate-900 bg-slate-900 text-white font-bold"
+                    : "border-slate-200 text-slate-600 hover:border-slate-400"
+                }`}
+              >
+                <s.icon className="w-3.5 h-3.5" />
+                {s.longLabel}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Category picker — only shown if section has more than 1 category */}
+        {availableCategories.length > 1 && (
+          <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 mb-6 flex-wrap">
+            <span className="text-sm font-semibold text-slate-700 shrink-0">{sectionMeta.label} Subject:</span>
+            <div className="flex flex-wrap gap-2">
+              {availableCategories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setCategory(cat.id)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${cat.outlineClasses} ${category === cat.id ? "ring-2 ring-offset-1 ring-indigo-400 font-bold" : "opacity-60 hover:opacity-100"}`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            <span className="ml-auto text-xs text-slate-400">
+              Selected: <strong className="text-slate-700">{getCategory(category).label}</strong>
+            </span>
+          </div>
+        )}
+
+        {/* Paper type picker */}
+        <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 mb-6 flex-wrap">
+          <span className="text-sm font-semibold text-slate-700 shrink-0">Paper Type:</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPaperType("chapter")}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${
+                paperType === "chapter"
+                  ? "bg-indigo-50 text-indigo-700 border-indigo-400 ring-2 ring-offset-1 ring-indigo-200 font-bold"
+                  : "bg-white text-slate-600 border-slate-200 opacity-70 hover:opacity-100"
+              }`}
+            >
+              📘 Chapter-wise Quiz
+            </button>
+            <button
+              onClick={() => setPaperType("mock")}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${
+                paperType === "mock"
+                  ? "bg-amber-50 text-amber-800 border-amber-400 ring-2 ring-offset-1 ring-amber-200 font-bold"
+                  : "bg-white text-slate-600 border-slate-200 opacity-70 hover:opacity-100"
+              }`}
+            >
+              🏆 Full Mock Paper
+            </button>
+          </div>
+          <span className="ml-auto text-xs text-slate-400">
+            {paperType === "mock" ? "Full-length exam-style paper" : "Topic / chapter-level quiz"}
+          </span>
         </div>
 
         {/* Mode selector */}
@@ -438,6 +581,23 @@ export default function CreateQuizPage() {
                     )}
                   </div>
 
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-1.5">How many questions to extract?</label>
+                    <select
+                      value={extractCount}
+                      onChange={(e) => setExtractCount(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    >
+                      <option value="all">All questions in the document</option>
+                      {[5, 10, 15, 20, 25, 30, 40, 50, 75, 100].map((n) => (
+                        <option key={n} value={n}>First {n} questions</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-400 mt-1">
+                      AI will extract up to this many — order follows the document.
+                    </p>
+                  </div>
+
                   {extractInfo && (
                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800">
                       <CheckCircle2 className="w-4 h-4 inline mr-2 text-emerald-600" />
@@ -513,13 +673,13 @@ export default function CreateQuizPage() {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Quiz Preview — Edit before saving</p>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getCategory(category).pillClasses}`}>
+                        {getCategory(category).label}
+                      </span>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        category === "maths" ? "bg-blue-100 text-blue-700"
-                        : category === "science" ? "bg-emerald-100 text-emerald-700"
-                        : category === "english" ? "bg-violet-100 text-violet-700"
-                        : "bg-slate-100 text-slate-600"
+                        paperType === "mock" ? "bg-amber-100 text-amber-800" : "bg-indigo-100 text-indigo-700"
                       }`}>
-                        {category === "science" ? "General Science" : category.charAt(0).toUpperCase() + category.slice(1)}
+                        {paperType === "mock" ? "🏆 Full Mock" : "📘 Chapter"}
                       </span>
                     </div>
                     <button onClick={() => setPreview(null)} className="text-slate-400 hover:text-slate-600 transition-colors">

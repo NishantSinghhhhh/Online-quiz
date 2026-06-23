@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, useRef, use } from "react";
 import Link from "next/link";
 import {
   Sparkles, ChevronLeft, ChevronRight, GraduationCap, Lightbulb,
@@ -8,6 +8,12 @@ import {
 } from "lucide-react";
 import { GrammarRule } from "@/types/english";
 import { QuizQuestion } from "@/types/quiz";
+
+function getSessionId() {
+  let id = localStorage.getItem("quiz_session_id");
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem("quiz_session_id", id); }
+  return id;
+}
 
 type Tab = "rule" | "examples" | "practice";
 
@@ -22,7 +28,9 @@ export default function GrammarRulePage({ params }: { params: Promise<{ id: stri
   const [selected, setSelected] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [score, setScore] = useState(0);
+  const [wrongIds, setWrongIds] = useState<number[]>([]);
   const [done, setDone] = useState(false);
+  const practiceStartedAt = useRef<number>(Date.now());
 
   useEffect(() => {
     fetch(`/api/grammar-rules/${id}`)
@@ -34,16 +42,32 @@ export default function GrammarRulePage({ params }: { params: Promise<{ id: stri
     if (revealed || !rule?.questions) return;
     setSelected(i);
     setRevealed(true);
-    if (i === rule.questions[currentQ].correctAnswer) setScore(s => s + 1);
+    const isCorrect = i === rule.questions[currentQ].correctAnswer;
+    if (isCorrect) setScore(s => s + 1);
+    else setWrongIds(prev => [...prev, currentQ]);
   }
 
-  function handleNextQ() {
+  async function handleNextQ() {
     if (!rule?.questions) return;
     if (currentQ < rule.questions.length - 1) {
       setCurrentQ(q => q + 1);
       setSelected(null);
       setRevealed(false);
     } else {
+      // Last question — derive final wrong list then persist
+      const lastWasCorrect = selected === rule.questions[currentQ].correctAnswer;
+      const finalWrongIds = lastWasCorrect ? wrongIds : [...wrongIds, currentQ];
+      await fetch(`/api/grammar-rules/${id}/attempt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: getSessionId(),
+          wrongIds: finalWrongIds,
+          score,
+          total: rule.questions.length,
+          timeTaken: Math.floor((Date.now() - practiceStartedAt.current) / 1000),
+        }),
+      });
       setDone(true);
     }
   }
@@ -53,7 +77,9 @@ export default function GrammarRulePage({ params }: { params: Promise<{ id: stri
     setSelected(null);
     setRevealed(false);
     setScore(0);
+    setWrongIds([]);
     setDone(false);
+    practiceStartedAt.current = Date.now();
   }
 
   if (loading) return (

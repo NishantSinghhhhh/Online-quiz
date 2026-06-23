@@ -50,7 +50,6 @@ export async function POST(req: NextRequest) {
       const buffer = Buffer.from(bytes);
 
       if (file.type === "application/pdf") {
-        // For PDFs, use OpenAI file upload
         const uploadedFile = await openai.files.create({
           file: new File([buffer], file.name, { type: "application/pdf" }),
           purpose: "assistants",
@@ -80,7 +79,6 @@ Focus on the key concepts, facts, and important information from the document.`,
         if (!content) throw new Error("No response from AI");
         return NextResponse.json({ quiz: JSON.parse(content) });
       } else {
-        // Text-based files
         documentContent = buffer.toString("utf-8");
       }
     }
