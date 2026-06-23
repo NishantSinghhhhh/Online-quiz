@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ user }, { status: 201 });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to create user";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error("[/api/users POST]", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
