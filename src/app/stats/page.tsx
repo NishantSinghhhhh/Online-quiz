@@ -218,7 +218,7 @@ export default function StatsPage() {
     <div className="min-h-screen bg-slate-50">
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/admin" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
@@ -228,8 +228,8 @@ export default function StatsPage() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <Link href="/admin" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-6 transition-colors">
-          <ChevronLeft className="w-4 h-4" /> Back to Admin
+        <Link href="/" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-6 transition-colors">
+          <ChevronLeft className="w-4 h-4" /> Back
         </Link>
 
         <div className="flex items-center gap-3 mb-6">

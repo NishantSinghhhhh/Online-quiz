@@ -22,13 +22,9 @@ interface QuizData {
   questions: QuizQuestion[];
 }
 
+// Stable per-user id, set by /login on sign-in.
 function getSessionId(): string {
-  let id = localStorage.getItem("quiz_session_id");
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem("quiz_session_id", id);
-  }
-  return id;
+  return localStorage.getItem("me_user_id") ?? "";
 }
 
 function formatTime(seconds: number): string {
@@ -58,7 +54,7 @@ export default function QuizPage({ params }: { params: Promise<{ id: string }> }
       .then((r) => r.json())
       .then(async (data: QuizData) => {
         setQuiz(data);
-        const res = await fetch(`/api/attempts?sessionId=${sessionId}&quizId=${id}`);
+        const res = await fetch(`/api/attempts?quizId=${id}`);
         const check = await res.json();
         if (check.attempted) {
           setExistingAttemptId(check.attemptId);

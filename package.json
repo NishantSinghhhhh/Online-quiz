@@ -10,7 +10,10 @@
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
     "migrate:turso": "tsx prisma/migrate-turso.ts",
-    "sync:turso": "tsx prisma/sync-to-turso.ts"
+    "sync:turso": "tsx prisma/sync-to-turso.ts",
+    "claim:attempts": "tsx prisma/claim-attempts.ts",
+    "move:attempts": "tsx prisma/move-attempts.ts",
+    "who:owns": "tsx prisma/who-owns-attempts.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

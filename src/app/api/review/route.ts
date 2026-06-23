@@ -2,17 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { QuizQuestion } from "@/types/quiz";
 import { normalizeCategoryId, type CategoryId } from "@/lib/categories";
+import { getCurrentUser } from "@/lib/auth";
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const sessionId = searchParams.get("sessionId");
-
-  if (!sessionId) {
-    return NextResponse.json({ error: "Missing sessionId" }, { status: 400 });
-  }
+export async function GET(_req: NextRequest) {
+  const me = await getCurrentUser();
+  if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const attempts = await prisma.attempt.findMany({
-    where: { sessionId },
+    where: { userId: me.sub },
     include: { quiz: true },
     orderBy: { completedAt: "desc" },
   });

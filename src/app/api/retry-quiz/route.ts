@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { QuizQuestion } from "@/types/quiz";
 import { normalizeCategoryId, getCategory, VALID_CATEGORY_IDS, type CategoryId } from "@/lib/categories";
+import { getCurrentUser } from "@/lib/auth";
 
 // POST: create a retry quiz from wrong answers — optionally filtered to a single subject.
-// Body: { sessionId: string, subject?: CategoryId | "all" }
+// Body: { subject?: CategoryId | "all" }
 export async function POST(req: NextRequest) {
   try {
-    const { sessionId, subject } = await req.json();
-    if (!sessionId) return NextResponse.json({ error: "Missing sessionId" }, { status: 400 });
+    const me = await getCurrentUser();
+    if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { subject } = await req.json();
 
     const subjectFilter: CategoryId | null =
       subject && subject !== "all" && (VALID_CATEGORY_IDS as readonly string[]).includes(subject)
@@ -16,7 +19,7 @@ export async function POST(req: NextRequest) {
         : null;
 
     const attempts = await prisma.attempt.findMany({
-      where: { sessionId },
+      where: { userId: me.sub },
       include: { quiz: true },
     });
 

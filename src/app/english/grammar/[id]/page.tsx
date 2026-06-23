@@ -10,9 +10,7 @@ import { GrammarRule } from "@/types/english";
 import { QuizQuestion } from "@/types/quiz";
 
 function getSessionId() {
-  let id = localStorage.getItem("quiz_session_id");
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem("quiz_session_id", id); }
-  return id;
+  return localStorage.getItem("me_user_id") ?? "";
 }
 
 type Tab = "rule" | "examples" | "practice";

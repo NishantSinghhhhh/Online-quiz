@@ -38,6 +38,7 @@ model Attempt {
   id          String   @id @default(cuid())
   quizId      String
   quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId      String?  // null on legacy rows from before auth
   sessionId   String
   answers     String   // JSON { [questionIndex]: selectedOptionIndex | null }
   score       Float    // can be fractional due to 1/3 negative marking
@@ -46,6 +47,12 @@ model Attempt {
   isRetry     Boolean  @default(false)
   completedAt DateTime @default(now())
   startedAt   DateTime
+
+  @@index([userId])
+  // Race guard for the "one attempt per quiz per user" rule. SQLite treats NULL
+  // as distinct, so legacy rows (userId IS NULL) and retry quizzes (each retry
+  // creates a fresh quizId) don't conflict.
+  @@unique([userId, quizId, isRetry])
 }
 
 // ── English: Vocabulary ──────────────────────────────────────
@@ -75,12 +82,15 @@ model VocabAttempt {
   id          String   @id @default(cuid())
   setId       String
   set         VocabSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  userId      String?
   sessionId   String
   wrongWordIds String  // JSON string[] of VocabWord IDs answered wrong
   score       Int
   total       Int
   timeTaken   Int
   completedAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ── English: Grammar (DRR format) ───────────────────────────
@@ -101,12 +111,15 @@ model GrammarAttempt {
   id          String      @id @default(cuid())
   ruleId      String
   rule        GrammarRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  userId      String?
   sessionId   String
   wrongIds    String      // JSON number[] — 0-based indices of questions answered wrong
   score       Int
   total       Int
   timeTaken   Int
   completedAt DateTime    @default(now())
+
+  @@index([userId])
 }
 
 // ── AI 1-pager notes (1 page per 20 input pages) ─────────────

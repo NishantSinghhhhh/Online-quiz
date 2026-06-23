@@ -6,9 +6,7 @@ import { CheckCircle2, XCircle, ChevronLeft, ChevronRight, Trophy, RotateCcw } f
 import { VocabWord } from "@/types/english";
 
 function getSessionId() {
-  let id = localStorage.getItem("quiz_session_id");
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem("quiz_session_id", id); }
-  return id;
+  return localStorage.getItem("me_user_id") ?? "";
 }
 
 function shuffle<T>(arr: T[]): T[] {

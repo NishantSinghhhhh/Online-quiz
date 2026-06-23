@@ -48,6 +48,14 @@ function LoginForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
 
+      // Use this user's stable id as the client session id for new attempts.
+      // Replaces the random localStorage UUID generated for anonymous sessions.
+      if (data.user?.id) {
+        localStorage.setItem("me_user_id", data.user.id);
+        // Clear the legacy random UUID so it can't override us.
+        localStorage.removeItem("quiz_session_id");
+      }
+
       const role = data.user?.role === "admin" ? "admin" : "user";
       router.push(destinationFor(role));
       router.refresh();

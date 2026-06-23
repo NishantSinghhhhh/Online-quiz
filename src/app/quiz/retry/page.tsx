@@ -7,9 +7,7 @@ import { Clock, ChevronLeft, ChevronRight, Sparkles, Lightbulb, BookOpen, Flag }
 import { QuizQuestion } from "@/types/quiz";
 
 function getSessionId(): string {
-  let id = localStorage.getItem("quiz_session_id");
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem("quiz_session_id", id); }
-  return id;
+  return localStorage.getItem("me_user_id") ?? "";
 }
 
 function formatTime(s: number) {

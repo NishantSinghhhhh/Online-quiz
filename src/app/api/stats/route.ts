@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizeCategoryId, CATEGORIES } from "@/lib/categories";
+import { getCurrentUser } from "@/lib/auth";
 
 // ── helpers ───────────────────────────────────────────────────
 // All bucketing uses local-time calendar dates (NOT UTC) so a quiz
@@ -42,6 +43,10 @@ function bumpBucket(map: Map<string, Bucket>, key: string, score: number, total:
 
 export async function GET() {
   try {
+    const me = await getCurrentUser();
+    if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = me.sub;
+
     const now = new Date();
     const since30 = new Date(now);
     since30.setDate(since30.getDate() - 29);
@@ -51,32 +56,32 @@ export async function GET() {
     since12w.setDate(since12w.getDate() - 7 * 11);
     since12w.setHours(0, 0, 0, 0);
 
-    // For streak, we need the union of *all* unique attempt dates ever
-    // (not just within 12 weeks). Keep this query cheap — just dates.
+    // Every query below is scoped to the signed-in user.
     const [quizAttempts, vocabAttempts, grammarAttempts, totalQuizzes, totalQuizAttempts, perCategoryRaw, allAttemptDates] = await Promise.all([
       prisma.attempt.findMany({
-        where: { completedAt: { gte: since12w } },
+        where: { userId, completedAt: { gte: since12w } },
         select: { score: true, totalScore: true, completedAt: true, quiz: { select: { category: true } } },
       }),
       prisma.vocabAttempt.findMany({
-        where: { completedAt: { gte: since12w } },
+        where: { userId, completedAt: { gte: since12w } },
         select: { score: true, total: true, completedAt: true },
       }),
       prisma.grammarAttempt.findMany({
-        where: { completedAt: { gte: since12w } },
+        where: { userId, completedAt: { gte: since12w } },
         select: { score: true, total: true, completedAt: true },
       }),
+      // Total quizzes available is the same for all users; not user-scoped.
       prisma.quiz.count({ where: { isRetry: false } }),
-      prisma.attempt.count(),
+      prisma.attempt.count({ where: { userId } }),
       prisma.attempt.findMany({
-        where: { completedAt: { gte: since30 } },
+        where: { userId, completedAt: { gte: since30 } },
         select: { score: true, totalScore: true, answers: true, quiz: { select: { category: true, questions: true } } },
       }),
-      // Just the date column from every kind of attempt, for streak math.
+      // All-time attempt dates (this user only) for streak math.
       Promise.all([
-        prisma.attempt.findMany({ select: { completedAt: true } }),
-        prisma.vocabAttempt.findMany({ select: { completedAt: true } }),
-        prisma.grammarAttempt.findMany({ select: { completedAt: true } }),
+        prisma.attempt.findMany({ where: { userId }, select: { completedAt: true } }),
+        prisma.vocabAttempt.findMany({ where: { userId }, select: { completedAt: true } }),
+        prisma.grammarAttempt.findMany({ where: { userId }, select: { completedAt: true } }),
       ]).then(([a, v, g]) => [...a, ...v, ...g].map(r => r.completedAt)),
     ]);
 

@@ -55,8 +55,7 @@ export default function ReviewPage() {
   const [creatingRetry, setCreatingRetry] = useState<SubjectTab | null>(null);
 
   useEffect(() => {
-    const sessionId = getSessionId();
-    fetch(`/api/review?sessionId=${sessionId}`)
+    fetch(`/api/review`)
       .then((r) => r.json())
       .then((data) => {
         setQuestions(data.questions || []);
@@ -86,11 +85,10 @@ export default function ReviewPage() {
 
   async function handleCreateRetryQuiz(subject: SubjectTab) {
     setCreatingRetry(subject);
-    const sessionId = getSessionId();
     const res = await fetch("/api/retry-quiz", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, subject }),
+      body: JSON.stringify({ subject }),
     });
     const data = await res.json();
     setCreatingRetry(null);

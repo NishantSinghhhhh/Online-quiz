@@ -174,6 +174,24 @@ export function sectionsForExam(exam: ExamId): SectionMeta[] {
   return SECTIONS.filter(s => s.exam === exam);
 }
 
+/** URL slug for a section — drops the redundant "<exam>_" prefix.
+ *  "cds_maths" → "maths", "afcat_general" → "general" */
+export function sectionSlug(sectionId: SectionId): string {
+  for (const e of EXAMS) {
+    const prefix = `${e.id}_`;
+    if (sectionId.startsWith(prefix)) return sectionId.slice(prefix.length);
+  }
+  return sectionId;
+}
+
+/** Resolve "/exam/cds/maths" → cds_maths section meta */
+export function findSectionBySlug(exam: ExamId, slug: string): SectionMeta | null {
+  // Exact id wins (e.g. "cds_maths" works too)
+  const exact = SECTIONS.find(s => s.exam === exam && s.id === slug);
+  if (exact) return exact;
+  return SECTIONS.find(s => s.exam === exam && s.id === `${exam}_${slug}`) ?? null;
+}
+
 // ── Categories (subjects within sections) ───────────────────
 export type CategoryId =
   // CDS Maths / CDS English share these
