@@ -11,12 +11,15 @@ import { createClient, type Client, type InValue } from "@libsql/client";
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 dotenv.config({ path: path.join(__dirname, "..", ".env.local"), override: true });
 
-const targetUrl = process.env.DATABASE_URL?.trim();
-if (!targetUrl) { console.error("DATABASE_URL not set"); process.exit(1); }
-if (targetUrl.startsWith("file:")) {
-  console.error("DATABASE_URL points to a local file — set it to your Turso URL first.");
-  process.exit(1);
-}
+const targetUrl: string = (() => {
+  const u = process.env.DATABASE_URL?.trim();
+  if (!u) { console.error("DATABASE_URL not set"); process.exit(1); }
+  if (u.startsWith("file:")) {
+    console.error("DATABASE_URL points to a local file — set it to your Turso URL first.");
+    process.exit(1);
+  }
+  return u;
+})();
 
 // Tables in dependency order (parents before children for FK constraints).
 const TABLES = [

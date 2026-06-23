@@ -13,8 +13,11 @@ import { createClient } from "@libsql/client";
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 dotenv.config({ path: path.join(__dirname, "..", ".env.local"), override: true });
 
-const url = process.env.DATABASE_URL?.trim();
-if (!url) { console.error("DATABASE_URL not set"); process.exit(1); }
+const url: string = (() => {
+  const u = process.env.DATABASE_URL?.trim();
+  if (!u) { console.error("DATABASE_URL not set"); process.exit(1); }
+  return u;
+})();
 console.log(`Migrating: ${url.replace(/authToken=[^&"]+/, "authToken=***")}`);
 
 const client = createClient({ url });
