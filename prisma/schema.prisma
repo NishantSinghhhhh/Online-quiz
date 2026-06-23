@@ -128,12 +128,19 @@ model GrammarAttempt {
 
 // ── AI 1-pager notes (1 page per 20 input pages) ─────────────
 model NoteSet {
-  id          String   @id @default(cuid())
-  subject     String   // "english" | "physics" | "chemistry" | "biology" | "maths" | "general"
-  title       String
-  summary     String?
-  sections    String   // JSON: { heading: string, points: string[] }[]
-  sourcePages Int
-  targetPages Int
-  createdAt   DateTime @default(now())
+  id                String   @id @default(cuid())
+  subject           String   // "english" | "physics" | "chemistry" | "biology" | "maths" | "general"
+  title             String
+  summary           String?
+  sections          String   // JSON: { heading: string, points: string[] }[]
+  sourcePages       Int
+  targetPages       Int
+  // Original uploaded PDF (or txt/md) — kept so students can re-read the source.
+  originalFilename  String?
+  originalSizeBytes Int?
+  originalContent   String?  // base64-encoded bytes (TEXT column for libsql portability)
+  originalMimeType  String?
+  createdAt         DateTime @default(now())
+
+  @@index([subject])
 }

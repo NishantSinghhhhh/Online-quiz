@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "prisma/seed.ts", "prisma/migrate-turso.ts", "prisma/sync-to-turso.ts", "prisma/claim-attempts.ts", "prisma/move-attempts.ts", "prisma/who-owns-attempts.ts"]
+  "exclude": ["node_modules", "prisma/seed.ts", "prisma/migrate-turso.ts", "prisma/sync-to-turso.ts", "prisma/claim-attempts.ts", "prisma/move-attempts.ts", "prisma/who-owns-attempts.ts", "prisma/dedupe-attempts.ts"]
 }

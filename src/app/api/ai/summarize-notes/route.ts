@@ -141,6 +141,16 @@ export async function POST(req: NextRequest) {
       : detectedPages;
     const targetPages = Math.max(1, Math.ceil(sourcePages / 20));
 
+    // Cap stored originals at 10MB to keep DB rows reasonable.
+    const STORE_LIMIT = 10 * 1024 * 1024;
+    const storeOriginal = buffer.length <= STORE_LIMIT;
+    const mime =
+      file.type ||
+      (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" :
+       file.name.toLowerCase().endsWith(".txt") ? "text/plain" :
+       file.name.toLowerCase().endsWith(".md")  ? "text/markdown" :
+       "application/octet-stream");
+
     const noteSet = await prisma.noteSet.create({
       data: {
         subject,
@@ -149,6 +159,10 @@ export async function POST(req: NextRequest) {
         sections: JSON.stringify(data.sections),
         sourcePages,
         targetPages,
+        originalFilename:  storeOriginal ? file.name : null,
+        originalSizeBytes: buffer.length,
+        originalContent:   storeOriginal ? buffer.toString("base64") : null,
+        originalMimeType:  storeOriginal ? mime : null,
       },
     });
 
@@ -161,6 +175,7 @@ export async function POST(req: NextRequest) {
       sourcePages,
       targetPages,
       method,
+      originalStored: storeOriginal,
     });
   } catch (err: unknown) {
     console.error("[summarize-notes]", err);

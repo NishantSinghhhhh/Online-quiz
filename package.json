@@ -13,7 +13,8 @@
     "sync:turso": "tsx prisma/sync-to-turso.ts",
     "claim:attempts": "tsx prisma/claim-attempts.ts",
     "move:attempts": "tsx prisma/move-attempts.ts",
-    "who:owns": "tsx prisma/who-owns-attempts.ts"
+    "who:owns": "tsx prisma/who-owns-attempts.ts",
+    "dedupe:attempts": "tsx prisma/dedupe-attempts.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

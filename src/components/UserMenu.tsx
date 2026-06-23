@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Users as UsersIcon,
   ChevronDown,
+  ScrollText,
 } from "lucide-react";
 import { useMe, clearMeCache } from "@/lib/use-me";
 
@@ -87,10 +88,12 @@ export function UserMenu({ variant = "student" }: UserMenuProps) {
           <nav className="py-1">
             <MenuItem href="/stats" icon={BarChart3} label="My Stats" desc="Heatmap · streak · weak areas" onSelect={() => setOpen(false)} />
             <MenuItem href="/review" icon={Target} label="Review Mistakes" desc="Wrong answers · practice" onSelect={() => setOpen(false)} />
+            <MenuItem href="/notes" icon={ScrollText} label="1-Pager Notes" desc="Read AI summaries · download PDFs" onSelect={() => setOpen(false)} />
             {me.role === "admin" && (
               <>
                 <div className="my-1 border-t border-slate-100" />
                 <MenuItem href="/admin" icon={ShieldCheck} label="Admin Dashboard" desc="Manage quizzes" onSelect={() => setOpen(false)} />
+                <MenuItem href="/admin/notes" icon={ScrollText} label="Manage Notes" desc="Upload · summarise · store" onSelect={() => setOpen(false)} />
                 <MenuItem href="/admin/users" icon={UsersIcon} label="Manage Users" desc="Create · reset · delete" onSelect={() => setOpen(false)} />
               </>
             )}

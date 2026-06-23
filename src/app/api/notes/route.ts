@@ -15,6 +15,9 @@ export async function GET(req: NextRequest) {
       summary: true,
       sourcePages: true,
       targetPages: true,
+      originalFilename: true,
+      originalSizeBytes: true,
+      // Don't ship the base64 blob in list responses — viewers fetch it from /file.
       createdAt: true,
     },
   });

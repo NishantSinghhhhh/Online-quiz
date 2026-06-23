@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizeCategoryId, categoriesForSection, SECTIONS, EXAMS, type SectionId } from "@/lib/categories";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -49,6 +50,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Admin-only: only admins create quizzes. The proxy gates /admin/* but this
+    // endpoint lives under /api/quizzes (not /api/admin/*), so guard it here.
+    // Retry quizzes are exempt — those are user-triggered via /api/retry-quiz
+    // which calls prisma.quiz.create directly.
+    const me = await getCurrentUser();
+    if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (me.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const body = await req.json();
     const { title, description, timeLimit, questions, category, paperType, isRetry, exam } = body;
 

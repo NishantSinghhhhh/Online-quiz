@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET() {
   try {
@@ -15,6 +16,10 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const me = await getCurrentUser();
+    if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (me.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const { title, topic, rule, memoryTrick, examples, examTraps, questions } =
       await req.json();
 

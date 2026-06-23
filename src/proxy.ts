@@ -16,8 +16,16 @@ const PUBLIC_PATHS = [
   "/favicon.ico",
 ];
 
-// Admin-only routes (besides the implicit /admin/*).
-const ADMIN_ONLY_PATHS = ["/admin/users", "/api/users"];
+// Admin-only routes.
+// Anything under /admin/* (except /admin/create — handled separately below) is
+// admin-only. API mutations and AI endpoints (which cost money) are also locked
+// down. Per-route handlers also call requireAdmin() as defense-in-depth in case
+// the proxy is ever bypassed (e.g. running on a host that doesn't honour it).
+const ADMIN_ONLY_PATHS = [
+  "/admin",          // covers /admin and every /admin/* page
+  "/api/users",      // create / delete / reset
+  "/api/ai",         // expensive AI calls — only admins generate content
+];
 
 function isPublic(pathname: string) {
   // Exact match OR descendant. Note: we deliberately do NOT use plain
@@ -43,7 +51,7 @@ function unauthorized(req: NextRequest) {
   return res;
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (isPublic(pathname)) return NextResponse.next();
@@ -87,7 +95,7 @@ export async function middleware(req: NextRequest) {
     } catch (err) {
       // Don't fail the request if re-issue fails — the existing token is still
       // valid until exp; we'll try again next request.
-      console.error("[middleware] sliding re-issue failed", err);
+      console.error("[proxy] sliding re-issue failed", err);
     }
   }
 
