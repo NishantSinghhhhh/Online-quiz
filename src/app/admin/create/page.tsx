@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -57,7 +57,7 @@ const EXAMPLE_JSON = `{
 
 type Mode = "json" | "prompt" | "upload" | "extract";
 
-export default function CreateQuizPage() {
+function CreateQuizInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("prompt");
@@ -792,5 +792,13 @@ export default function CreateQuizPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreateQuizPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <CreateQuizInner />
+    </Suspense>
   );
 }
