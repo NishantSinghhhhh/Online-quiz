@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { getCurrentUser } from "@/lib/auth";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -34,6 +35,12 @@ Rules:
 
 export async function POST(req: NextRequest) {
   try {
+    // Defense-in-depth: proxy gates /api/ai/* but each handler self-defends so
+    // an OpenAI call can't be triggered if the proxy is ever bypassed.
+    const me = await getCurrentUser();
+    if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (me.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const { prompt, questionCount = 10, difficulty = "medium" } = await req.json();
 
     if (!prompt) {

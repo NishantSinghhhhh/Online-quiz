@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFParse } from "pdf-parse";
 import OpenAI from "openai";
+import { getCurrentUser } from "@/lib/auth";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -111,6 +112,10 @@ async function extractViaText(text: string, limit: number | null): Promise<strin
 
 export async function POST(req: NextRequest) {
   try {
+    const me = await getCurrentUser();
+    if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (me.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const limitRaw = formData.get("limit");

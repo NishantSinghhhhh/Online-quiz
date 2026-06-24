@@ -9,18 +9,40 @@ datasource db {
 
 // ── Main Quizzes ─────────────────────────────────────────────
 model Quiz {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
   description String?
   timeLimit   Int
-  questions   String    // JSON QuizQuestion[]
-  category    String    @default("general") // see src/lib/categories.ts
-  exam        String    @default("cds")     // "afcat" | "cds"
-  paperType   String    @default("chapter") // "chapter" | "mock"
-  isRetry     Boolean   @default(false)     // system-generated retry quiz
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  questions   String        // JSON QuizQuestion[]
+  category    String        @default("general") // see src/lib/categories.ts
+  exam        String        @default("cds")     // "afcat" | "cds"
+  paperType   String        @default("chapter") // "chapter" | "mock"
+  isRetry     Boolean       @default(false)     // system-generated retry quiz
+  // Used for per-user rate-limiting of /api/retry-quiz. Nullable for legacy
+  // and admin-created quizzes where attribution isn't needed.
+  createdById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   attempts    Attempt[]
+  sessions    QuizSession[]
+
+  @@index([createdById])
+}
+
+// Server-stamped quiz start time. Created by POST /api/quizzes/[id]/start and
+// consumed by POST /api/attempts so clients can't backdate `startedAt` to
+// claim impossible completion times. One open session per (userId, quizId);
+// refreshing during a quiz reuses the same session via upsert.
+model QuizSession {
+  id        String   @id @default(cuid())
+  quizId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId    String
+  startedAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@unique([userId, quizId])
+  @@index([expiresAt])
 }
 
 // ── Users (auth) ─────────────────────────────────────────────

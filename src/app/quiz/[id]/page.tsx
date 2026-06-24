@@ -45,7 +45,10 @@ export default function QuizPage({ params }: { params: Promise<{ id: string }> }
   const [answers, setAnswers] = useState<Record<number, number | null>>({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [startedAt, setStartedAt] = useState<string>("");
+  // Server-stamped session id from POST /api/quizzes/[id]/start. The server
+  // derives elapsed-time from session.startedAt, so the client can't backdate.
+  const [quizSessionId, setQuizSessionId] = useState<string>("");
+  const [startError, setStartError] = useState<string | null>(null);
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
 
   useEffect(() => {
@@ -73,7 +76,7 @@ export default function QuizPage({ params }: { params: Promise<{ id: string }> }
     const res = await fetch("/api/attempts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quizId: id, sessionId, answers, startedAt }),
+      body: JSON.stringify({ quizId: id, sessionId, quizSessionId, answers }),
     });
 
     const data = await res.json();
@@ -82,7 +85,7 @@ export default function QuizPage({ params }: { params: Promise<{ id: string }> }
     } else if (res.status === 409) {
       router.push(`/quiz/${id}/results/${data.attemptId}`);
     }
-  }, [quiz, id, answers, startedAt, router]);
+  }, [quiz, id, answers, quizSessionId, router]);
 
   useEffect(() => {
     if (status !== "quiz") return;
@@ -99,10 +102,28 @@ export default function QuizPage({ params }: { params: Promise<{ id: string }> }
     return () => clearInterval(interval);
   }, [status, handleSubmit]);
 
-  function startQuiz() {
+  async function startQuiz() {
     if (!quiz) return;
-    setTimeLeft(quiz.timeLimit * 60);
-    setStartedAt(new Date().toISOString());
+    setStartError(null);
+    // Server stamps startedAt and returns the session id we'll submit with.
+    // Upsert on the server means a refresh-mid-quiz reuses the same session
+    // (and the same time budget).
+    const res = await fetch(`/api/quizzes/${id}/start`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok || !data.sessionId) {
+      if (res.status === 409 && data.attemptId) {
+        // Already-attempted race — bounce straight to results.
+        router.push(`/quiz/${id}/results/${data.attemptId}`);
+        return;
+      }
+      setStartError(data.error ?? "Failed to start quiz");
+      return;
+    }
+    setQuizSessionId(data.sessionId);
+    // Trust server's startedAt + expiresAt so the timer matches the server's view.
+    const startedMs = new Date(data.startedAt).getTime();
+    const elapsedS = Math.max(0, Math.floor((Date.now() - startedMs) / 1000));
+    setTimeLeft(Math.max(0, quiz.timeLimit * 60 - elapsedS));
     setStatus("quiz");
   }
 
@@ -199,6 +220,11 @@ export default function QuizPage({ params }: { params: Promise<{ id: string }> }
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-800">
               <strong>Important:</strong> You can only attempt this quiz once. Make sure you have a stable internet connection before starting.
             </div>
+            {startError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-sm text-red-700">
+                {startError}
+              </div>
+            )}
             <button
               onClick={startQuiz}
               className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"

@@ -30,7 +30,7 @@ export async function POST(
     if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { sessionId, wrongIds, timeTaken } = body;
+    const { sessionId, answers, timeTaken } = body;
 
     if (sessionId !== undefined && sessionId !== null &&
         (typeof sessionId !== "string" || sessionId.length > MAX_SESSION_ID_LEN)) {
@@ -41,18 +41,32 @@ export async function POST(
     if (!rule) return NextResponse.json({ error: "Rule not found" }, { status: 404 });
 
     // Grammar rule questions live as JSON on the rule itself.
-    const questions: unknown = rule.questions ? JSON.parse(rule.questions) : [];
-    const total = Array.isArray(questions) ? questions.length : 0;
+    type GrammarQ = { correctAnswer?: number };
+    const parsed: unknown = rule.questions ? JSON.parse(rule.questions) : [];
+    const questions: GrammarQ[] = Array.isArray(parsed) ? (parsed as GrammarQ[]) : [];
+    const total = questions.length;
 
-    // Filter wrongIds to valid 0-based question indices for this rule.
-    const wrongArr: unknown[] = Array.isArray(wrongIds) ? wrongIds : [];
-    const filteredWrong = Array.from(
-      new Set(
-        wrongArr.filter((n): n is number =>
-          typeof n === "number" && Number.isInteger(n) && n >= 0 && n < total
-        )
-      )
-    );
+    // Server grades: client sends `answers` as { [qIndex]: selectedOptionIndex }.
+    // We compute wrongIds ourselves so a doctored payload (e.g. `{}`) can't
+    // claim a perfect score.
+    const answerMap: Record<string, unknown> =
+      answers && typeof answers === "object" && !Array.isArray(answers)
+        ? (answers as Record<string, unknown>)
+        : {};
+
+    const filteredWrong: number[] = [];
+    for (let i = 0; i < total; i++) {
+      const selected = answerMap[String(i)];
+      const correct = questions[i]?.correctAnswer;
+      if (typeof selected !== "number" || !Number.isInteger(selected)) {
+        // skipped or malformed — treat as wrong
+        filteredWrong.push(i);
+        continue;
+      }
+      if (typeof correct !== "number" || selected !== correct) {
+        filteredWrong.push(i);
+      }
+    }
 
     const score = Math.max(0, total - filteredWrong.length);
 

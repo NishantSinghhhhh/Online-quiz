@@ -30,12 +30,24 @@ export async function GET(
       return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
     }
 
+    // Non-admins must never see correctAnswer/explanation before they submit —
+    // otherwise the quiz is trivially cheatable from DevTools. Admins (quiz
+    // management UI) still get the full payload.
+    const me = await getCurrentUser();
+    const rawQuestions = JSON.parse(quiz.questions);
+    const questions = me?.role === "admin"
+      ? rawQuestions
+      : (Array.isArray(rawQuestions) ? rawQuestions : []).map((q: Record<string, unknown>) => {
+          const { correctAnswer: _ca, explanation: _ex, ...safe } = q;
+          return safe;
+        });
+
     return NextResponse.json({
       id: quiz.id,
       title: quiz.title,
       description: quiz.description,
       timeLimit: quiz.timeLimit,
-      questions: JSON.parse(quiz.questions),
+      questions,
       attemptCount: quiz._count.attempts,
       attempts: quiz.attempts,
       createdAt: quiz.createdAt,

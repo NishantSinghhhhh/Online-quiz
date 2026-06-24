@@ -27,6 +27,7 @@ export default function GrammarRulePage({ params }: { params: Promise<{ id: stri
   const [revealed, setRevealed] = useState(false);
   const [score, setScore] = useState(0);
   const [wrongIds, setWrongIds] = useState<number[]>([]);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
   const [done, setDone] = useState(false);
   const practiceStartedAt = useRef<number>(Date.now());
 
@@ -40,6 +41,7 @@ export default function GrammarRulePage({ params }: { params: Promise<{ id: stri
     if (revealed || !rule?.questions) return;
     setSelected(i);
     setRevealed(true);
+    setAnswers(prev => ({ ...prev, [currentQ]: i }));
     const isCorrect = i === rule.questions[currentQ].correctAnswer;
     if (isCorrect) setScore(s => s + 1);
     else setWrongIds(prev => [...prev, currentQ]);
@@ -52,17 +54,13 @@ export default function GrammarRulePage({ params }: { params: Promise<{ id: stri
       setSelected(null);
       setRevealed(false);
     } else {
-      // Last question — derive final wrong list then persist
-      const lastWasCorrect = selected === rule.questions[currentQ].correctAnswer;
-      const finalWrongIds = lastWasCorrect ? wrongIds : [...wrongIds, currentQ];
+      // Last question — server grades from `answers`, we just send what was picked.
       await fetch(`/api/grammar-rules/${id}/attempt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId: getSessionId(),
-          wrongIds: finalWrongIds,
-          score,
-          total: rule.questions.length,
+          answers,
           timeTaken: Math.floor((Date.now() - practiceStartedAt.current) / 1000),
         }),
       });
@@ -76,6 +74,7 @@ export default function GrammarRulePage({ params }: { params: Promise<{ id: stri
     setRevealed(false);
     setScore(0);
     setWrongIds([]);
+    setAnswers({});
     setDone(false);
     practiceStartedAt.current = Date.now();
   }
