@@ -11,6 +11,8 @@ import {
   Users as UsersIcon,
   ChevronDown,
   ScrollText,
+  Languages,
+  GraduationCap,
 } from "lucide-react";
 import { useMe, clearMeCache } from "@/lib/use-me";
 
@@ -89,6 +91,10 @@ export function UserMenu({ variant = "student" }: UserMenuProps) {
             <MenuItem href="/stats" icon={BarChart3} label="My Stats" desc="Heatmap · streak · weak areas" onSelect={() => setOpen(false)} />
             <MenuItem href="/review" icon={Target} label="Review Mistakes" desc="Wrong answers · practice" onSelect={() => setOpen(false)} />
             <MenuItem href="/notes" icon={ScrollText} label="1-Pager Notes" desc="Read AI summaries · download PDFs" onSelect={() => setOpen(false)} />
+            <div className="my-1 border-t border-slate-100" />
+            <div className="px-4 pt-1 pb-0.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">English Hub</div>
+            <MenuItem href="/english/vocabulary" icon={Languages} label="Vocabulary" desc="Word sets · mnemonics · quizzes" onSelect={() => setOpen(false)} />
+            <MenuItem href="/english/grammar" icon={GraduationCap} label="Grammar Rules" desc="DRR cards · practice questions" onSelect={() => setOpen(false)} />
             {me.role === "admin" && (
               <>
                 <div className="my-1 border-t border-slate-100" />
