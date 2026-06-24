@@ -7,6 +7,8 @@ import {
   BarChart3,
   Users as UsersIcon,
   Plus,
+  Languages,
+  ScrollText,
 } from "lucide-react";
 import { EXAMS } from "@/lib/categories";
 import { UserMenu } from "@/components/UserMenu";
@@ -75,6 +77,52 @@ export default function AdminPage() {
               </Link>
             );
           })}
+        </div>
+
+        {/* Quick content shortcuts — for things that don't belong to a single exam */}
+        <div className="max-w-4xl mx-auto mt-12">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Content shortcuts</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Link
+              href="/admin/english"
+              className="group flex items-center gap-3 rounded-2xl p-4 bg-white border-2 border-slate-200 hover:border-violet-400 hover:shadow-md transition-all"
+            >
+              <div className="w-11 h-11 rounded-xl bg-violet-100 flex items-center justify-center group-hover:bg-violet-600 transition-colors">
+                <Languages className="w-5 h-5 text-violet-600 group-hover:text-white transition-colors" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-slate-900">Vocab + Grammar</p>
+                <p className="text-xs text-slate-500">Upload English content</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-violet-600 group-hover:translate-x-0.5 transition-all" />
+            </Link>
+            <Link
+              href="/admin/notes"
+              className="group flex items-center gap-3 rounded-2xl p-4 bg-white border-2 border-slate-200 hover:border-amber-400 hover:shadow-md transition-all"
+            >
+              <div className="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center group-hover:bg-amber-600 transition-colors">
+                <ScrollText className="w-5 h-5 text-amber-600 group-hover:text-white transition-colors" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-slate-900">1-Pager Notes</p>
+                <p className="text-xs text-slate-500">Upload · AI summarise · store</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all" />
+            </Link>
+            <Link
+              href="/admin/users"
+              className="group flex items-center gap-3 rounded-2xl p-4 bg-white border-2 border-slate-200 hover:border-indigo-400 hover:shadow-md transition-all"
+            >
+              <div className="w-11 h-11 rounded-xl bg-indigo-100 flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
+                <UsersIcon className="w-5 h-5 text-indigo-600 group-hover:text-white transition-colors" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-slate-900">Users</p>
+                <p className="text-xs text-slate-500">Create · reset · delete</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+            </Link>
+          </div>
         </div>
       </div>
     </div>

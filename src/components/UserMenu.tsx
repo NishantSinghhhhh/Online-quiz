@@ -99,6 +99,7 @@ export function UserMenu({ variant = "student" }: UserMenuProps) {
               <>
                 <div className="my-1 border-t border-slate-100" />
                 <MenuItem href="/admin" icon={ShieldCheck} label="Admin Dashboard" desc="Manage quizzes" onSelect={() => setOpen(false)} />
+                <MenuItem href="/admin/english" icon={Languages} label="Manage English" desc="Upload vocab + grammar PDFs" onSelect={() => setOpen(false)} />
                 <MenuItem href="/admin/notes" icon={ScrollText} label="Manage Notes" desc="Upload · summarise · store" onSelect={() => setOpen(false)} />
                 <MenuItem href="/admin/users" icon={UsersIcon} label="Manage Users" desc="Create · reset · delete" onSelect={() => setOpen(false)} />
               </>
